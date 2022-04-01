@@ -198,6 +198,39 @@ pub fn echo_handler(args: &mut Vec<String>) {
     }
 }
 
+fn execute_command(
+    status_code: &mut i32,
+    command: String,
+    args: &mut Vec<String>,
+) -> Option<Child> {
+    let child = Command::new(command).args(args).spawn();
+
+    match child {
+        Ok(mut child) => {
+            unsafe {
+                RUNNING_PROCESS_PID = child.id() as i32;
+            }
+            match child.wait() {
+                Ok(status) => unsafe {
+                    RUNNING_PROCESS_PID = 0;
+                    match status.code() {
+                        Some(status) => {
+                            *status_code = status;
+                        }
+                        None => {
+                            *status_code = 0;
+                        }
+                    }
+                    return Some(child);
+                },
+                Err(e) => eprintln!("{}", e),
+            };
+        }
+        Err(e) => eprintln!("{}", e),
+    }
+    return None;
+}
+
 pub fn command_matcher(
     env: &mut HashMap<String, String>,
     args: &mut Vec<String>,
@@ -215,30 +248,7 @@ pub fn command_matcher(
         "pwd" => print_var(env, "PWD"),
         "unset" => unset_redirector(env, args),
         _ => {
-            let child = Command::new(command).args(args).spawn();
-            match child {
-                Ok(mut child) => {
-                    unsafe {
-                        RUNNING_PROCESS_PID = child.id() as i32;
-                    }
-                    match child.wait() {
-                        Ok(status) => unsafe {
-                            RUNNING_PROCESS_PID = 0;
-                            match status.code() {
-                                Some(status) => {
-                                    *status_code = status;
-                                }
-                                None => {
-                                    *status_code = 0;
-                                }
-                            }
-                            return Some(child);
-                        },
-                        Err(e) => eprintln!("{}", e),
-                    };
-                }
-                Err(e) => eprintln!("{}", e),
-            }
+            return execute_command(status_code, command, args);
         }
     }
     return None;
