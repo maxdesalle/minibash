@@ -275,8 +275,20 @@ pub fn splitter(input: &mut String) -> Vec<String> {
             }
         } else {
             while i < input.len() && input.chars().nth(i).unwrap() != ' ' {
-                arg.push(input.chars().nth(i).unwrap());
-                i += 1;
+                if input.chars().nth(i).unwrap() == '"' {
+                    if i + 1 < input.len() {
+                        i += 1;
+                    } else {
+                        break;
+                    }
+                    while i < input.len() && input.chars().nth(i).unwrap() != '"' {
+                        arg.push(input.chars().nth(i).unwrap());
+                        i += 1;
+                    }
+                } else {
+                    arg.push(input.chars().nth(i).unwrap());
+                    i += 1;
+                }
             }
         }
         if !arg.is_empty() {
