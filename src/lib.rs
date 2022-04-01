@@ -293,12 +293,19 @@ fn invalid_char_check(c: char) -> bool {
 
 pub fn dollar_expander(env: &mut HashMap<String, String>, input: &mut String) {
     let mut i = 0;
+    let mut between_quotes = false;
 
     while i < input.len() {
-        if input.chars().nth(i).unwrap() == '\'' {
+        if input.chars().nth(i).unwrap() == '\'' && between_quotes == false {
             i += 1;
             while input.chars().nth(i).unwrap() != '\'' && i + 1 < input.len() {
                 i += 1;
+            }
+        } else if input.chars().nth(i).unwrap() == '"' {
+            if between_quotes == true {
+                between_quotes = false;
+            } else {
+                between_quotes = true;
             }
         } else if input.chars().nth(i).unwrap() == '$' {
             let mut save = i + 1;
