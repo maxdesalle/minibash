@@ -1,6 +1,10 @@
 # minibash
 
-A lightweight shell based on bash 3.2. **minibash** supports all of the commands a traditional shell supports `env, cd, echo...`
+A lightweight shell inspired by bash (version 3.2). **minibash** supports all of the commands a traditional shell supports `env, cd, echo...` as well as operators `&&, |, >, >>, ;`
+
+<p align="center">
+<img src="https://media.giphy.com/media/P6qPAAW7jX5guAHcws/giphy.gif" width="65%" />
+</p>
 
 > **Note**: redirections to the left `< and <<` are currently not supported.
 

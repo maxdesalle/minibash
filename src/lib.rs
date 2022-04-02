@@ -393,6 +393,9 @@ pub fn dollar_expander(env: &mut HashMap<String, String>, input: String) -> Stri
                 Some(var) => {
                     save -= 1;
                     input.replace_range(save..i, var);
+                    if save > var.len() {
+                        i -= save - var.len();
+                    }
                 }
                 None => {}
             }

@@ -74,6 +74,7 @@ fn main() {
                     let file = OpenOptions::new()
                         .read(true)
                         .write(true)
+                        .truncate(true)
                         .create(true)
                         .open(iterator.peek().unwrap().text.clone());
                     match file {
