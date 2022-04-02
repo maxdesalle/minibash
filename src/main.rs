@@ -1,10 +1,10 @@
 use std::collections::HashMap;
-use std::fs::File;
+use std::fs::OpenOptions;
 use std::io::stdin;
 use std::io::stdout;
 use std::io::Write;
 use std::os::unix::io::{FromRawFd, IntoRawFd};
-use std::process::{Child, Stdio};
+use std::process::Stdio;
 
 pub mod lib;
 use lib::*;
@@ -63,7 +63,34 @@ fn main() {
             let input_output =
                 if command.separator == Separator::WriteRedirection && iterator.peek().is_some() {
                     skip = true;
-                    let file = File::create(iterator.peek().unwrap().text.clone());
+                    let file = OpenOptions::new()
+                        .read(true)
+                        .write(true)
+                        .create(true)
+                        .open(iterator.peek().unwrap().text.clone());
+                    match file {
+                        Ok(file) => {
+                            let file_out = file.try_clone();
+                            unsafe {
+                                Some(InputOutput {
+                                    file: Some(file),
+                                    stdout: Stdio::from_raw_fd(file_out.unwrap().into_raw_fd()),
+                                    output: None,
+                                })
+                            }
+                        }
+                        Err(_) => None,
+                    }
+                } else if command.separator == Separator::WriteAppendRedirection
+                    && iterator.peek().is_some()
+                {
+                    skip = true;
+                    let file = OpenOptions::new()
+                        .read(true)
+                        .write(true)
+                        .append(true)
+                        .create(true)
+                        .open(iterator.peek().unwrap().text.clone());
                     match file {
                         Ok(file) => {
                             let file_out = file.try_clone();

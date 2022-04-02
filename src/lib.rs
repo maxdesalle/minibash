@@ -87,14 +87,14 @@ fn cd(env: &mut HashMap<String, String>, arg: &mut String) {
 fn export_no_args(env: &mut HashMap<String, String>, input_output: InputOutput) {
     let mut sorted: Vec<_> = env.iter().collect();
 
-    let mut stdout = match input_output.file {
+    let mut output = match input_output.file {
         Some(output) => Box::new(output) as Box<dyn Write>,
         None => Box::new(stdout()) as Box<dyn Write>,
     };
 
     sorted.sort_by_key(|a| a.0);
     for (key, value) in sorted {
-        writeln!(stdout, "declare -x {}=\"{}\"", key, value)
+        writeln!(output, "declare -x {}=\"{}\"", key, value)
             .unwrap_or_else(|err| println!("{:?}", err));
     }
 }
@@ -121,13 +121,13 @@ fn unset(env: &mut HashMap<String, String>, args: &mut Vec<String>) {
 }
 
 fn print_env(env: &mut HashMap<String, String>, input_output: InputOutput) {
-    let mut stdout = match input_output.file {
+    let mut output = match input_output.file {
         Some(output) => Box::new(output) as Box<dyn Write>,
         None => Box::new(stdout()) as Box<dyn Write>,
     };
 
     for (key, value) in env {
-        writeln!(stdout, "{}={}", key, value).unwrap_or_else(|err| println!("{:?}", err));
+        writeln!(output, "{}={}", key, value).unwrap_or_else(|err| println!("{:?}", err));
     }
 }
 
@@ -160,16 +160,16 @@ pub fn exit_handler(args: &mut Vec<String>) {
 }
 
 fn print_var(env: &mut HashMap<String, String>, variable: &str, input_output: InputOutput) {
-    let mut stdout = match input_output.file {
+    let mut output = match input_output.file {
         Some(output) => Box::new(output) as Box<dyn Write>,
         None => Box::new(stdout()) as Box<dyn Write>,
     };
 
     match env.get(variable) {
         Some(var) => {
-            writeln!(stdout, "{}", var.to_string()).unwrap_or_else(|err| println!("{:?}", err))
+            writeln!(output, "{}", var.to_string()).unwrap_or_else(|err| println!("{:?}", err))
         }
-        None => writeln!(stdout, "${} environment variable not set", variable)
+        None => writeln!(output, "${} environment variable not set", variable)
             .unwrap_or_else(|err| println!("{:?}", err)),
     };
 }
@@ -209,13 +209,13 @@ pub fn export_redirector(
     }
 }
 
-fn echo_option_n(args: &mut Vec<String>, mut stdout: Box<dyn Write>) {
+fn echo_option_n(args: &mut Vec<String>, mut output: Box<dyn Write>) {
     let mut i = 1;
 
     while i < args.len() {
-        write!(stdout, "{}", args[i]).unwrap_or_else(|err| println!("{:?}", err));
+        write!(output, "{}", args[i]).unwrap_or_else(|err| println!("{:?}", err));
         if i != args.len() - 1 {
-            write!(stdout, " ").unwrap_or_else(|err| println!("{:?}", err));
+            write!(output, " ").unwrap_or_else(|err| println!("{:?}", err));
         }
         i += 1;
     }
@@ -224,21 +224,21 @@ fn echo_option_n(args: &mut Vec<String>, mut stdout: Box<dyn Write>) {
 pub fn echo_handler(args: &mut Vec<String>, input_output: InputOutput) {
     let mut i = 0;
 
-    let mut stdout = match input_output.file {
+    let mut output = match input_output.file {
         Some(output) => Box::new(output) as Box<dyn Write>,
         None => Box::new(stdout()) as Box<dyn Write>,
     };
 
     while i < args.len() {
         if i == 0 && args[i].as_str() == "-n" {
-            echo_option_n(args, stdout);
+            echo_option_n(args, output);
             return;
         }
-        write!(stdout, "{}", args[i]).unwrap_or_else(|err| println!("{:?}", err));
+        write!(output, "{}", args[i]).unwrap_or_else(|err| println!("{:?}", err));
         if i == args.len() - 1 {
-            writeln!(stdout, "").unwrap_or_else(|err| println!("{:?}", err));
+            writeln!(output, "").unwrap_or_else(|err| println!("{:?}", err));
         } else {
-            write!(stdout, " ").unwrap_or_else(|err| println!("{:?}", err));
+            write!(output, " ").unwrap_or_else(|err| println!("{:?}", err));
         }
         i += 1;
     }
