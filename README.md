@@ -4,6 +4,8 @@ A lightweight shell based on bash 3.2. **minibash** supports all of the commands
 
 > **Note**: redirections to the left `< and <<` are currently not supported.
 
+![minibash in action](https://gfycat.com/offbeatbraveblackwidowspider)
+
 ## Using it
 To start the shell, execute the following command:
 ```bash
