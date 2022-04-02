@@ -2,7 +2,7 @@
 
 A lightweight shell based on bash 3.2. **minibash** supports all of the commands a traditional shell supports `env, cd, echo...`
 
-> **Note**: it currently does not support pipes and redirections.
+> **Note**: redirections to the left `< and <<` are currently not supported.
 
 ## Using it
 To start the shell, execute the following command:

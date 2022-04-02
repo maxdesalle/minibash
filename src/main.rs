@@ -4,6 +4,7 @@ use std::io::stdin;
 use std::io::stdout;
 use std::io::Write;
 use std::os::unix::io::{FromRawFd, IntoRawFd};
+use std::process::Child;
 use std::process::Stdio;
 
 pub mod lib;
@@ -38,6 +39,7 @@ fn main() {
         let commands: Vec<CommandObject> = arg_split(&mut input);
         let mut iterator = commands.iter().peekable();
         let mut skip = false;
+        let mut previous_command: Option<Child> = None;
 
         while let Some(command) = iterator.next() {
             if skip_until_semicolon == true {
@@ -60,6 +62,12 @@ fn main() {
                 continue;
             }
 
+            let stdin = previous_command
+                .take()
+                .map_or(Stdio::inherit(), |output: Child| {
+                    Stdio::from(output.stdout.unwrap())
+                });
+
             let input_output =
                 if command.separator == Separator::WriteRedirection && iterator.peek().is_some() {
                     skip = true;
@@ -74,6 +82,7 @@ fn main() {
                             unsafe {
                                 Some(InputOutput {
                                     file: Some(file),
+                                    stdin: stdin,
                                     stdout: Stdio::from_raw_fd(file_out.unwrap().into_raw_fd()),
                                     output: None,
                                 })
@@ -97,6 +106,7 @@ fn main() {
                             unsafe {
                                 Some(InputOutput {
                                     file: Some(file),
+                                    stdin: stdin,
                                     stdout: Stdio::from_raw_fd(file_out.unwrap().into_raw_fd()),
                                     output: None,
                                 })
@@ -107,12 +117,14 @@ fn main() {
                 } else if command.separator == Separator::Pipe && iterator.peek().is_some() {
                     Some(InputOutput {
                         file: None,
+                        stdin: stdin,
                         stdout: Stdio::piped(),
                         output: None,
                     })
                 } else {
                     Some(InputOutput {
                         file: None,
+                        stdin: stdin,
                         stdout: Stdio::inherit(),
                         output: None,
                     })
@@ -127,9 +139,11 @@ fn main() {
 
             match input_output {
                 Some(input_output) => {
-                    command_matcher(&mut env, &mut args, &mut command, input_output);
+                    previous_command =
+                        command_matcher(&mut env, &mut args, &mut command, input_output);
                 }
                 None => {
+                    previous_command = None;
                     skip_until_semicolon = true;
                     eprintln!("Error opening file");
                     continue;

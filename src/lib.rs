@@ -19,6 +19,7 @@ pub enum Separator {
 
 pub struct InputOutput {
     pub file: Option<File>,
+    pub stdin: Stdio,
     pub stdout: Stdio,
     pub output: Option<Child>,
 }
@@ -255,7 +256,7 @@ fn execute_command(
 ) -> Option<Child> {
     let child = Command::new(executable)
         .args(args)
-        .stdin(Stdio::inherit())
+        .stdin(input_output.stdin)
         .stdout(input_output.stdout)
         .spawn();
 
@@ -461,7 +462,7 @@ pub fn arg_split(input: &mut String) -> Vec<CommandObject> {
             }
         } else if input.chars().nth(i).unwrap() == '"' {
             i += 1;
-            while i + 1 < input.len() && input.chars().nth(i).unwrap() != '\'' {
+            while i + 1 < input.len() && input.chars().nth(i).unwrap() != '"' {
                 i += 1;
             }
         } else if i + 1 < input.len() && input.chars().nth(i).unwrap() == '&' {
@@ -511,11 +512,13 @@ pub fn arg_split(input: &mut String) -> Vec<CommandObject> {
         i += 1;
     }
 
-    commands.push(CommandObject {
-        text: input[j..i].trim().to_string(),
-        separator: Separator::Empty,
-        status_code: 0,
-    });
+    if j < input.len() {
+        commands.push(CommandObject {
+            text: input[j..i].trim().to_string(),
+            separator: Separator::Empty,
+            status_code: 0,
+        });
+    }
 
     return commands;
 }
