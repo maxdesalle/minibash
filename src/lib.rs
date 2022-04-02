@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::env;
-use std::fs::{metadata, File};
+use std::fs::File;
 use std::io::{stdout, Write};
 use std::path::Path;
 use std::process::{exit, Child, Command, Stdio};
@@ -128,7 +128,7 @@ fn print_env(env: &mut HashMap<String, String>, input_output: InputOutput) {
     };
 
     for (key, value) in env {
-        writeln!(stdout, "{}={}", key, value);
+        writeln!(stdout, "{}={}", key, value).unwrap_or_else(|err| println!("{:?}", err));
     }
 }
 
@@ -156,8 +156,11 @@ fn print_var(env: &mut HashMap<String, String>, variable: &str, input_output: In
     };
 
     match env.get(variable) {
-        Some(var) => writeln!(stdout, "{}", var.to_string()),
-        None => writeln!(stdout, "${} environment variable not set", variable),
+        Some(var) => {
+            writeln!(stdout, "{}", var.to_string()).unwrap_or_else(|err| println!("{:?}", err))
+        }
+        None => writeln!(stdout, "${} environment variable not set", variable)
+            .unwrap_or_else(|err| println!("{:?}", err)),
     };
 }
 
@@ -200,9 +203,9 @@ fn echo_option_n(args: &mut Vec<String>, mut stdout: Box<dyn Write>) {
     let mut i = 1;
 
     while i < args.len() {
-        write!(stdout, "{}", args[i]);
+        write!(stdout, "{}", args[i]).unwrap_or_else(|err| println!("{:?}", err));
         if i != args.len() - 1 {
-            write!(stdout, " ");
+            write!(stdout, " ").unwrap_or_else(|err| println!("{:?}", err));
         }
         i += 1;
     }
@@ -221,11 +224,11 @@ pub fn echo_handler(args: &mut Vec<String>, input_output: InputOutput) {
             echo_option_n(args, stdout);
             return;
         }
-        write!(stdout, "{}", args[i]);
+        write!(stdout, "{}", args[i]).unwrap_or_else(|err| println!("{:?}", err));
         if i == args.len() - 1 {
-            writeln!(stdout, "");
+            writeln!(stdout, "").unwrap_or_else(|err| println!("{:?}", err));
         } else {
-            write!(stdout, " ");
+            write!(stdout, " ").unwrap_or_else(|err| println!("{:?}", err));
         }
         i += 1;
     }
