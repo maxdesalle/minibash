@@ -8,8 +8,6 @@ A lightweight shell inspired by bash (version 3.2). **minibash** supports all of
 
 > **Note**: redirections to the left `< and <<` are currently not supported.
 
-![minibash in action](https://gfycat.com/offbeatbraveblackwidowspider)
-
 ## Using it
 To start the shell, execute the following command:
 ```bash
