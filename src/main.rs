@@ -4,7 +4,7 @@ use std::io::stdin;
 use std::io::stdout;
 use std::io::Write;
 use std::os::unix::io::{FromRawFd, IntoRawFd};
-use std::process::Stdio;
+use std::process::{Child, Stdio};
 
 pub mod lib;
 use lib::*;
@@ -54,6 +54,7 @@ fn main() {
                     }
                 }
             }
+
             if skip == true {
                 skip = false;
                 continue;
@@ -70,15 +71,23 @@ fn main() {
                                 Some(InputOutput {
                                     file: Some(file),
                                     stdout: Stdio::from_raw_fd(file_out.unwrap().into_raw_fd()),
+                                    output: None,
                                 })
                             }
                         }
                         Err(_) => None,
                     }
+                } else if command.separator == Separator::Pipe && iterator.peek().is_some() {
+                    Some(InputOutput {
+                        file: None,
+                        stdout: Stdio::piped(),
+                        output: None,
+                    })
                 } else {
                     Some(InputOutput {
                         file: None,
                         stdout: Stdio::inherit(),
+                        output: None,
                     })
                 };
 
@@ -91,7 +100,7 @@ fn main() {
 
             match input_output {
                 Some(input_output) => {
-                    command_matcher(&mut env, &mut args, &mut command, input_output)
+                    command_matcher(&mut env, &mut args, &mut command, input_output);
                 }
                 None => {
                     skip_until_semicolon = true;

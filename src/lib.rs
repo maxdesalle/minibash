@@ -12,16 +12,15 @@ pub enum Separator {
     Ampersand, // &&
     Pipe,      // |
     Empty,
-    SemiColon,               // ;
-    WriteRedirection,        // >
-    WriteAppendRedirection,  // >>
-    ListenRedirection,       // <
-    ListenAppendRedirection, // <<
+    SemiColon,              // ;
+    WriteRedirection,       // >
+    WriteAppendRedirection, // >>
 }
 
 pub struct InputOutput {
     pub file: Option<File>,
     pub stdout: Stdio,
+    pub output: Option<Child>,
 }
 
 #[derive(Clone)]
@@ -144,9 +143,20 @@ pub fn save_env() -> HashMap<String, String> {
     return env;
 }
 
-pub fn exit_handler() {
+pub fn exit_handler(args: &mut Vec<String>) {
     println!("exit");
-    exit(0);
+    let status_code = if args.len() == 0 {
+        0
+    } else {
+        match args[0].parse() {
+            Ok(status_code) => status_code,
+            Err(_) => {
+                eprintln!("minibash: exit: {}: numeric argument required", args[0]);
+                255
+            }
+        }
+    };
+    exit(status_code);
 }
 
 fn print_var(env: &mut HashMap<String, String>, variable: &str, input_output: InputOutput) {
@@ -285,7 +295,7 @@ pub fn command_matcher(
         "clear" => print!("\x1B[2J\x1B[1;1H"),
         "echo" => echo_handler(args, input_output),
         "env" => print_env(env, input_output),
-        "exit" => exit_handler(),
+        "exit" => exit_handler(args),
         "export" => export_redirector(env, args, input_output),
         "pwd" => print_var(env, "PWD", input_output),
         "unset" => unset_redirector(env, args),
@@ -448,14 +458,23 @@ pub fn arg_split(input: &mut String) -> Vec<CommandObject> {
             while i + 1 < input.len() && input.chars().nth(i).unwrap() != '\'' {
                 i += 1;
             }
-        } else if input.chars().nth(i).unwrap() == '&' {
-            if i + 1 < input.len() {
-                commands.push(CommandObject {
-                    text: input[j..i].trim().to_string(),
-                    separator: Separator::Ampersand,
-                    status_code: 0,
-                });
-            }
+        } else if i + 1 < input.len() && input.chars().nth(i).unwrap() == '&' {
+            commands.push(CommandObject {
+                text: input[j..i].trim().to_string(),
+                separator: Separator::Ampersand,
+                status_code: 0,
+            });
+            i += 1;
+            j = i + 2;
+        } else if i + 1 < input.len()
+            && input.chars().nth(i).unwrap() == '>'
+            && input.chars().nth(i + 1).unwrap() == '>'
+        {
+            commands.push(CommandObject {
+                text: input[j..i].trim().to_string(),
+                separator: Separator::WriteAppendRedirection,
+                status_code: 0,
+            });
             i += 1;
             j = i + 2;
         } else if input.chars().nth(i).unwrap() == '|' {
