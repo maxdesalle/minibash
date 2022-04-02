@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 use std::env;
-use std::io::stdout;
-use std::io::Write;
+use std::fs::{metadata, File};
+use std::io::{stdout, Write};
 use std::path::Path;
-use std::process::{exit, Child, Command};
+use std::process::{exit, Child, Command, Stdio};
 
 static mut RUNNING_PROCESS_PID: i32 = 0;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum Separator {
     Ampersand, // &&
     Pipe,      // |
@@ -19,9 +19,16 @@ pub enum Separator {
     ListenAppendRedirection, // <<
 }
 
+pub struct InputOutput {
+    pub file: Option<File>,
+    pub stdout: Stdio,
+}
+
+#[derive(Clone)]
 pub struct CommandObject {
     pub text: String,
     pub separator: Separator,
+    pub status_code: i32,
 }
 
 fn cd_update_env(env: &mut HashMap<String, String>) {
@@ -78,11 +85,18 @@ fn cd(env: &mut HashMap<String, String>, arg: &mut String) {
     }
 }
 
-fn export_no_args(env: &mut HashMap<String, String>) {
+fn export_no_args(env: &mut HashMap<String, String>, input_output: InputOutput) {
     let mut sorted: Vec<_> = env.iter().collect();
+
+    let mut stdout = match input_output.file {
+        Some(output) => Box::new(output) as Box<dyn Write>,
+        None => Box::new(stdout()) as Box<dyn Write>,
+    };
+
     sorted.sort_by_key(|a| a.0);
     for (key, value) in sorted {
-        println!("declare -x {}=\"{}\"", key, value);
+        writeln!(stdout, "declare -x {}=\"{}\"", key, value)
+            .unwrap_or_else(|err| println!("{:?}", err));
     }
 }
 
@@ -107,9 +121,14 @@ fn unset(env: &mut HashMap<String, String>, args: &mut Vec<String>) {
     }
 }
 
-fn print_env(env: &mut HashMap<String, String>) {
+fn print_env(env: &mut HashMap<String, String>, input_output: InputOutput) {
+    let mut stdout = match input_output.file {
+        Some(output) => Box::new(output) as Box<dyn Write>,
+        None => Box::new(stdout()) as Box<dyn Write>,
+    };
+
     for (key, value) in env {
-        println!("{}={}", key, value);
+        writeln!(stdout, "{}={}", key, value);
     }
 }
 
@@ -130,11 +149,16 @@ pub fn exit_handler() {
     exit(0);
 }
 
-fn print_var(env: &mut HashMap<String, String>, variable: &str) {
+fn print_var(env: &mut HashMap<String, String>, variable: &str, input_output: InputOutput) {
+    let mut stdout = match input_output.file {
+        Some(output) => Box::new(output) as Box<dyn Write>,
+        None => Box::new(stdout()) as Box<dyn Write>,
+    };
+
     match env.get(variable) {
-        Some(var) => println!("{}", var.to_string()),
-        None => eprintln!("${} environment variable not set", variable),
-    }
+        Some(var) => writeln!(stdout, "{}", var.to_string()),
+        None => writeln!(stdout, "${} environment variable not set", variable),
+    };
 }
 
 pub fn cd_redirector(env: &mut HashMap<String, String>, args: &mut Vec<String>) {
@@ -160,50 +184,64 @@ pub fn unset_redirector(env: &mut HashMap<String, String>, args: &mut Vec<String
     }
 }
 
-pub fn export_redirector(env: &mut HashMap<String, String>, args: &mut Vec<String>) {
+pub fn export_redirector(
+    env: &mut HashMap<String, String>,
+    args: &mut Vec<String>,
+    input_output: InputOutput,
+) {
     if args.len() == 0 {
-        export_no_args(env);
+        export_no_args(env, input_output);
     } else {
         export_with_args(env, args);
     }
 }
 
-fn echo_option_n(args: &mut Vec<String>) {
+fn echo_option_n(args: &mut Vec<String>, mut stdout: Box<dyn Write>) {
     let mut i = 1;
 
     while i < args.len() {
-        print!("{}", args[i]);
+        write!(stdout, "{}", args[i]);
         if i != args.len() - 1 {
-            print!(" ");
+            write!(stdout, " ");
         }
         i += 1;
     }
 }
 
-pub fn echo_handler(args: &mut Vec<String>) {
+pub fn echo_handler(args: &mut Vec<String>, input_output: InputOutput) {
     let mut i = 0;
+
+    let mut stdout = match input_output.file {
+        Some(output) => Box::new(output) as Box<dyn Write>,
+        None => Box::new(stdout()) as Box<dyn Write>,
+    };
 
     while i < args.len() {
         if i == 0 && args[i].as_str() == "-n" {
-            echo_option_n(args);
+            echo_option_n(args, stdout);
             return;
         }
-        print!("{}", args[i]);
+        write!(stdout, "{}", args[i]);
         if i == args.len() - 1 {
-            println!();
+            writeln!(stdout, "");
         } else {
-            print!(" ");
+            write!(stdout, " ");
         }
         i += 1;
     }
 }
 
 fn execute_command(
-    status_code: &mut i32,
-    command: String,
+    command: &mut CommandObject,
+    executable: String,
     args: &mut Vec<String>,
+    input_output: InputOutput,
 ) -> Option<Child> {
-    let child = Command::new(command).args(args).spawn();
+    let child = Command::new(executable)
+        .args(args)
+        .stdin(Stdio::inherit())
+        .stdout(input_output.stdout)
+        .spawn();
 
     match child {
         Ok(mut child) => {
@@ -215,10 +253,10 @@ fn execute_command(
                     RUNNING_PROCESS_PID = 0;
                     match status.code() {
                         Some(status) => {
-                            *status_code = status;
+                            command.status_code = status;
                         }
                         None => {
-                            *status_code = 0;
+                            command.status_code = 0;
                         }
                     }
                     return Some(child);
@@ -234,21 +272,22 @@ fn execute_command(
 pub fn command_matcher(
     env: &mut HashMap<String, String>,
     args: &mut Vec<String>,
-    status_code: &mut i32,
+    command: &mut CommandObject,
+    input_output: InputOutput,
 ) -> Option<Child> {
-    let command = args.remove(0);
+    let executable = args.remove(0);
 
-    match command.as_str() {
+    match executable.as_str() {
         "cd" => cd_redirector(env, args),
         "clear" => print!("\x1B[2J\x1B[1;1H"),
-        "echo" => echo_handler(args),
-        "env" => print_env(env),
+        "echo" => echo_handler(args, input_output),
+        "env" => print_env(env, input_output),
         "exit" => exit_handler(),
-        "export" => export_redirector(env, args),
-        "pwd" => print_var(env, "PWD"),
+        "export" => export_redirector(env, args, input_output),
+        "pwd" => print_var(env, "PWD", input_output),
         "unset" => unset_redirector(env, args),
         _ => {
-            return execute_command(status_code, command, args);
+            return execute_command(command, executable, args, input_output);
         }
     }
     return None;
@@ -411,6 +450,7 @@ pub fn arg_split(input: &mut String) -> Vec<CommandObject> {
                 commands.push(CommandObject {
                     text: input[j..i].trim().to_string(),
                     separator: Separator::Ampersand,
+                    status_code: 0,
                 });
             }
             i += 1;
@@ -419,6 +459,7 @@ pub fn arg_split(input: &mut String) -> Vec<CommandObject> {
             commands.push(CommandObject {
                 text: input[j..i].trim().to_string(),
                 separator: Separator::Pipe,
+                status_code: 0,
             });
             i += 1;
             j = i + 1;
@@ -426,6 +467,7 @@ pub fn arg_split(input: &mut String) -> Vec<CommandObject> {
             commands.push(CommandObject {
                 text: input[j..i].trim().to_string(),
                 separator: Separator::SemiColon,
+                status_code: 0,
             });
             i += 1;
             j = i + 1;
@@ -433,6 +475,7 @@ pub fn arg_split(input: &mut String) -> Vec<CommandObject> {
             commands.push(CommandObject {
                 text: input[j..i].trim().to_string(),
                 separator: Separator::WriteRedirection,
+                status_code: 0,
             });
             i += 1;
             j = i + 1;
@@ -443,6 +486,7 @@ pub fn arg_split(input: &mut String) -> Vec<CommandObject> {
     commands.push(CommandObject {
         text: input[j..i].trim().to_string(),
         separator: Separator::Empty,
+        status_code: 0,
     });
 
     return commands;

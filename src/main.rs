@@ -1,7 +1,10 @@
 use std::collections::HashMap;
+use std::fs::File;
 use std::io::stdin;
 use std::io::stdout;
 use std::io::Write;
+use std::os::unix::io::{FromRawFd, IntoRawFd};
+use std::process::Stdio;
 
 pub mod lib;
 use lib::*;
@@ -33,7 +36,8 @@ fn main() {
         }
         let mut input = input.trim().to_string();
         let commands: Vec<CommandObject> = arg_split(&mut input);
-        let mut iterator = commands.iter();
+        let mut iterator = commands.iter().peekable();
+        let mut skip = false;
 
         while let Some(command) = iterator.next() {
             if skip_until_semicolon == true {
@@ -50,16 +54,53 @@ fn main() {
                     }
                 }
             }
+            if skip == true {
+                skip = false;
+                continue;
+            }
+
+            let input_output =
+                if command.separator == Separator::WriteRedirection && iterator.peek().is_some() {
+                    skip = true;
+                    let file = File::create(iterator.peek().unwrap().text.clone());
+                    match file {
+                        Ok(file) => {
+                            let file_out = file.try_clone();
+                            unsafe {
+                                Some(InputOutput {
+                                    file: Some(file),
+                                    stdout: Stdio::from_raw_fd(file_out.unwrap().into_raw_fd()),
+                                })
+                            }
+                        }
+                        Err(_) => None,
+                    }
+                } else {
+                    Some(InputOutput {
+                        file: None,
+                        stdout: Stdio::inherit(),
+                    })
+                };
 
             let mut args = splitter(&dollar_expander(&mut env, command.text.clone()));
             if args.is_empty() {
                 continue;
             }
 
-            let mut status_code = 0;
-            command_matcher(&mut env, &mut args, &mut status_code);
+            let mut command = command.clone();
 
-            if status_code != 0 && command.separator == Separator::Ampersand {
+            match input_output {
+                Some(input_output) => {
+                    command_matcher(&mut env, &mut args, &mut command, input_output)
+                }
+                None => {
+                    skip_until_semicolon = true;
+                    eprintln!("Error opening file");
+                    continue;
+                }
+            };
+
+            if command.status_code != 0 && command.separator == Separator::Ampersand {
                 skip_until_semicolon = true;
             }
         }
