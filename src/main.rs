@@ -33,8 +33,9 @@ fn main() {
         }
         let mut input = input.trim().to_string();
         let commands: Vec<CommandObject> = arg_split(&mut input);
+        let mut iterator = commands.iter();
 
-        for mut command in commands {
+        while let Some(command) = iterator.next() {
             if skip_until_semicolon == true {
                 if command.separator != Separator::SemiColon
                     && command.separator != Separator::Empty
@@ -50,9 +51,7 @@ fn main() {
                 }
             }
 
-            dollar_expander(&mut env, &mut command.text);
-
-            let mut args = splitter(&mut command.text);
+            let mut args = splitter(&dollar_expander(&mut env, command.text.clone()));
             if args.is_empty() {
                 continue;
             }

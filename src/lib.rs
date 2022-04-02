@@ -254,7 +254,7 @@ pub fn command_matcher(
     return None;
 }
 
-pub fn splitter(input: &mut String) -> Vec<String> {
+pub fn splitter(input: &String) -> Vec<String> {
     let mut i = 0;
     let mut vec: Vec<String> = Vec::new();
 
@@ -303,9 +303,10 @@ fn invalid_char_check(c: char) -> bool {
     return c != ' ' && c != '\'' && c != '"';
 }
 
-pub fn dollar_expander(env: &mut HashMap<String, String>, input: &mut String) {
+pub fn dollar_expander(env: &mut HashMap<String, String>, input: String) -> String {
     let mut i = 0;
     let mut between_quotes = false;
+    let mut input = input.clone();
 
     while i < input.len() {
         if input.chars().nth(i).unwrap() == '\'' && between_quotes == false {
@@ -339,6 +340,7 @@ pub fn dollar_expander(env: &mut HashMap<String, String>, input: &mut String) {
         }
         i += 1;
     }
+    return input;
 }
 
 #[allow(unused_variables)]
@@ -424,6 +426,13 @@ pub fn arg_split(input: &mut String) -> Vec<CommandObject> {
             commands.push(CommandObject {
                 text: input[j..i].trim().to_string(),
                 separator: Separator::SemiColon,
+            });
+            i += 1;
+            j = i + 1;
+        } else if input.chars().nth(i).unwrap() == '>' {
+            commands.push(CommandObject {
+                text: input[j..i].trim().to_string(),
+                separator: Separator::WriteRedirection,
             });
             i += 1;
             j = i + 1;
