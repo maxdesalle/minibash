@@ -127,7 +127,9 @@ fn print_env(env: &mut HashMap<String, String>, input_output: InputOutput) {
     };
 
     for (key, value) in env {
-        writeln!(output, "{}={}", key, value).unwrap_or_else(|err| println!("{:?}", err));
+        if key.as_str() != "?" {
+            writeln!(output, "{}={}", key, value).unwrap_or_else(|err| println!("{:?}", err));
+        }
     }
 }
 
@@ -249,6 +251,7 @@ fn execute_command(
     executable: String,
     args: &mut Vec<String>,
     input_output: InputOutput,
+    env: &mut HashMap<String, String>,
 ) -> Option<Child> {
     let child = Command::new(executable)
         .args(args)
@@ -267,9 +270,11 @@ fn execute_command(
                     match status.code() {
                         Some(status) => {
                             command.status_code = status;
+                            env.insert("?".to_string(), status.to_string());
                         }
                         None => {
                             command.status_code = 0;
+                            env.insert("?".to_string(), "0".to_string());
                         }
                     }
                     return Some(child);
@@ -300,9 +305,10 @@ pub fn command_matcher(
         "pwd" => print_var(env, "PWD", input_output),
         "unset" => unset_redirector(env, args),
         _ => {
-            return execute_command(command, executable, args, input_output);
+            return execute_command(command, executable, args, input_output, env);
         }
     }
+    env.insert("?".to_string(), "0".to_string());
     return None;
 }
 
@@ -310,7 +316,7 @@ pub fn splitter(input: &String) -> Vec<String> {
     let mut i = 0;
     let mut vec: Vec<String> = Vec::new();
 
-    while i + 1 < input.len() {
+    while i < input.len() {
         let mut arg = String::new();
 
         if input.chars().nth(i).unwrap() == '"' {
