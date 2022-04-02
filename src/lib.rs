@@ -384,7 +384,7 @@ pub fn dollar_expander(env: &mut HashMap<String, String>, input: String) -> Stri
             while invalid_char_check(input.chars().nth(i).unwrap()) && i + 1 < input.len() {
                 i += 1;
             }
-            if input.chars().last().unwrap() != '"' {
+            if input.chars().last().unwrap() != '"' && i + 1 == input.len() {
                 i += 1;
             }
 

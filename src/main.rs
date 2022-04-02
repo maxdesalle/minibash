@@ -150,6 +150,10 @@ fn main() {
                 }
             };
 
+            if command.separator != Separator::Pipe {
+                previous_command = None;
+            }
+
             if command.status_code != 0 && command.separator == Separator::Ampersand {
                 skip_until_semicolon = true;
             }
