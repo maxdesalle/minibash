@@ -6,7 +6,7 @@ A lightweight shell inspired by bash (version 3.2). **minibash** supports all of
 <img src="https://media.giphy.com/media/P6qPAAW7jX5guAHcws/giphy.gif" width="65%" />
 </p>
 
-> **Note**: redirections to the left `< and <<` are currently not supported.
+**Note** Redirections to the left `< and <<` are currently not supported.
 
 ## Using it
 To start the shell, execute the following command:
